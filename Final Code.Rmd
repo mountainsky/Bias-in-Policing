@@ -1,0 +1,740 @@
+---
+title: "Data 602 Final Project - Bias in Policing"
+author: "Team 4 - Annie, Graeme, Jackson, Umair"
+date: "2023-10-14"
+output:
+  html_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo=FALSE, message=FALSE, error=FALSE}
+library(dplyr)
+library(ggplot2)
+library(plotrix)
+library("readr")
+library("mosaic")
+```
+
+
+# Introduction:
+  
+
+Police control is of paramount importance in maintaining public safety on our roadways. Making traffic stops is a crucial component of this effort. These stops serve as a proactive measure to enforce traffic laws, ensuring that drivers adhere to speed limits, obey traffic signals, and follow other rules of the road. By doing so, they help reduce the likelihood of accidents, injuries, and fatalities. Traffic stops not only deter reckless behavior but also provide an opportunity for law enforcement officers to address violations promptly. This can lead to the removal of dangerous drivers from the road, the identification of vehicles involved in criminal activities, and the prevention of potential hazards. In sum, traffic stops play a vital role in enhancing public safety by promoting responsible driving and maintaining order on our streets and highways.
+
+While traffic stops are an essential tool in maintaining road safety, they are not without their drawbacks and potential for bias. One of the main concerns is the possibility of racial or ethnic profiling during stops, where drivers are pulled over based on their appearance rather than their behavior. This can lead to unfair and discriminatory treatment, eroding trust between law enforcement and the community. Additionally, frequent traffic stops, particularly in certain neighborhoods, can contribute to feelings of harassment and resentment among residents. Furthermore, the practice of pretextual stops, where law enforcement officers use minor traffic violations as a pretense for investigating other potential offenses, can raise civil liberties concerns. Striking a balance between enforcing traffic laws and safeguarding against bias and abuse is an ongoing challenge in the realm of traffic stops, highlighting the need for fair and equitable policing practices.
+
+# Purpose
+
+The aim of this project is to investigate disparities in police stops in New Orleans, United States. This analysis holds practical implications for enhancing public awareness and facilitating discussion around police reform. We are particularly interested in how race, age, and gender relate to the frequency of traffic stops. We would also like to consider how different groups are treated after the stop— meaning whether there is bias present when an arrest or search takes place. It is also important to consider the location of the stop which may reveal biases based on socioeconomic class.
+
+The variables in the dataset that will allow us to carry out these tasks are the following: driver race, driver sex, driver age, stop location, arrest made, frisk performed, search conducted, and reason for stop. The data is from official records collected from police stations around the United States, which was requested and cleaned by the Stanford Computational Journalism Lab and Stanford Computational Policy Lab.
+
+# The Data:
+
+The data set we will be using is from the Stanford Open Policing Project which contains standardized data for traffic stops by location. Since its inception in 2015, the Stanford Open Policing Project has been requesting traffic stop records from all U.S. states and as of now, they have collected over 200 million nationwide instances of traffic stops and searches. The data is made available for public use under the Open Data Commons Attribution License. The location we will be focusing on for this project is New Orleans since it contains records for almost all the listed variables and is a manageable-sized file with 512,088 observations. The time period for this dataset is from December 2009 to July 2018.
+
+```{r}
+df = read.csv("la_new_orleans_2020_04_01.csv")
+
+summary(df)
+```
+As evident, the data set at hand is very detailed and consists over a dozen variables including date, time, and location of the traffic stop, age, race, and sex of the subject, reason for the stop, was a search conducted, any illegal substance found, and was a warning issued or an arrest made.
+
+Since we will be running three tests to analyze bias, that is one for gender, one for race and one for location. We will use the following value as alpha for each test to test our hypothesis for both issues so that the total value of alpha stays at 0.05:
+
+```{r}
+Alpha = 0.05
+No_of_Tests = 3
+
+New_alpha = 0.05/3
+
+New_alpha
+```
+
+# Guiding Question 1
+
+The first question that we are looking to address is to identify if there is any bias present in police stops. The variables that come in to play for this purpose are 'Subject Sex' and 'Subject Race' and 'district'. We want to observe if there is any bias for police stops on the basis of gender and race of the person being stopped and the location where they are being stopped at.
+
+# Police Stops by Gender
+
+In the data, we have a variable 'Subject Race' which lists the gender of the person being stopped. A basic representation of this variable is as follows,
+
+```{r}
+ggplot(data=subset(df, !is.na(subject_sex))) + geom_bar(mapping=aes(x=subject_sex, fill=subject_sex)) + xlab("Subject Sex") + ggtitle("Bar Graph for Tarffic Stops by Sex")
+```
+
+The above Bar chart shows that more males have been stopped than females but that does not necessarily mean that there is a bias. There simply could be more male drivers as compared to female drivers and that could logically result in more men being stopped.
+
+From the Federal Highway Administration website of the United States, we have obtained the proportions for male and female drivers in the state of Louisiana. Firstly we will conduct a prop test for both males and females from our data while also incorporating the gender proportions obtained from the Federal Highway website to check where our hypothesis stands and then we will proceed to plot our results to see if our results mirror the numbers obtained from the website.
+
+Our statistical hypothesis for bias in police stoppage based on gender is as follows:
+$$
+H_0: P_{genders_{actual}} - \widehat P_{genders_{data}} = 0 \ (There \ is \ no \ bias \ based \ on \ gender) \\
+H_A: P_{genders_{actual}} - \widehat P_{genders_{data}} \neq 0 \ (There \ is \ bias \ based \ on \ gender) \\
+$$
+Below are the actual gender proportions obtained from the website of Federal Highway Administration.
+
+```{r}
+actual_gender_p = matrix(c(0.4806, 0.5194), ncol=2, byrow=TRUE)
+colnames(actual_gender_p) = c('Male','Female')
+
+actual_gender_p
+```
+Since we are testing for bias in both the genders, we will further divide alpha by 2.
+
+```{r}
+adj_alpha = New_alpha/2
+conf = 1 - adj_alpha
+adj_alpha
+```
+
+```{r}
+N <- length(df$subject_sex)
+M <- length(df[df$subject_sex == 'male',]$subject_sex)
+f <- length(df[df$subject_sex == 'female',]$subject_sex)
+
+#The following values are taken from Federal Highway Administration for driver proportions
+malep <- 0.4806
+Femalep <- 0.5194
+
+#Run two-sided one sample proportion tests against expected gender proportions
+mci = prop.test(M,N,p=malep, conf.level=conf)
+fci = prop.test(f,N,p=Femalep, conf.level=conf)
+
+#Get p-values
+pM = mci$p.value
+pf = fci$p.value
+
+p_vals <- c(pM,pf)
+
+#Get boundaries
+lM = mci$conf.int[1]
+lF = fci$conf.int[1]
+
+uM = mci$conf.int[2]
+uf = fci$conf.int[2]
+
+Lb <- c(lM,lF)
+Ub <- c(uM,uf)
+
+#Formatting data for plotting
+genders <- c("Male","Female")
+#Gvals is the standard driver proportions of state of louisiana
+Gvals <- c(malep, Femalep)
+Gdata <- data.frame(genders,Gvals,Lb,Ub)
+```
+
+
+```{r}
+#for (i in 1:2){
+#print(paste("The p-value for the",genders[i],"one sample proportion test is:",p_vals[i]))
+#}
+
+mci
+fci
+
+```
+
+Given that all these p-values are less than 0.008333333, we can say that there is statistical evidence that the proportion of police stops for each gender does not match the population proportions. Thus we reject the null hypothesis and can conclude that there is apparent bias in police stoppage based on gender.
+
+```{r}
+ggplot(Gdata) +
+    geom_bar(aes(x=genders, y=Gvals), stat="identity", fill="pink", alpha=0.9) +
+    geom_errorbar(aes(x=genders, ymin=Lb, ymax=Ub), width=0.9, colour="red", linewidth=0.7) +   ggtitle("Driver Proportions + Confidence Intervals") + xlab("Gender") + ylab("Proportions")
+```
+
+If we observe the visual above, the pink bars represent the actual gender proportions and the red line represents the proportions of the respective genders being stopped. We can observe that the proportion of female drivers being stopped by the police is lower than the overall proportion of female drivers. On the contrary, the proportion of male drivers being stopped is far greater than the overall proportion of male drivers. This visualization along with our hypothesis testing allows us to conclude that there is gender based bias present in police stops.
+
+# Police Stops by Race
+
+The second variable through which we will gauge bias is race. In our data we have a variable 'Subject Race' which lists the race of the individuals stopped by the police. A basic visual representation of this variable is as follows,
+
+```{r}
+ggplot(data=subset(df, !is.na(subject_race))) + geom_bar(mapping=aes(x=subject_race, fill=subject_race)) + xlab("Subject Race") + ggtitle("Bar Graph for Tarffic Stops by Race")
+```
+
+Once again, if we look at the visual for the race variable, black people are stopped the most by a long margin. But in order to conclude if there is bias based on Race, we have to take in to consideration the actual race demographics of New Orleans. We have obtained the the racial demographics for New Orleans from the US census website. We observed that the race proportions have been quite steady over the last decade and have used the data from 2022.
+
+We will take a similar approach as we did for the genders and execute a prop test for the race variable in our data set while incorporating the race proportions obtained from the US Census website. 
+
+Below are the actual race proportions obtained from the New Orleans census data.
+
+```{r}
+Actual_Race_p = matrix(c(0.327, 0.581, 0.056, 0.027), ncol=4, byrow=TRUE)
+colnames(Actual_Race_p) = c('White','Black','Hispanic','Asian')
+
+Actual_Race_p
+```
+Here we are testing bias for 4 races thus we are adjusting our value so that the cumulative value for alpha remains at 5% for all the tests.
+
+```{r}
+adj_alpha1 = New_alpha/4
+adj_alpha1
+```
+
+```{r}
+n <- length(df$subject_race)
+
+w <- length(df[df$subject_race == 'white',]$subject_race)
+b <- length(df[df$subject_race == 'black',]$subject_race)
+h <- length(df[df$subject_race == 'hispanic',]$subject_race)
+a <- length(df[df$subject_race == 'asian/pacific islander',]$subject_race)
+
+#The following values are taken from New Orleans census data for population proportions
+whitep <- 0.327
+blackp <- 0.581
+hispanicp <- 0.056
+asianp <- 0.027
+```
+
+```{r}
+#Using multiple tests together, we will adjust the confidence level
+# where we divide alpha to ensure the alpha value is intact.
+tN = 4 * 3
+conf = 1 - (0.05)/tN
+
+#Run two-sided one sample proportion tests against expected race proportions
+wci = prop.test(w,n,p=whitep, conf.level=conf)
+bci = prop.test(b,n,p=blackp, conf.level=conf)
+hci = prop.test(h,n,p=hispanicp, conf.level=conf)
+aci = prop.test(a,n,p=asianp, conf.level=conf)
+
+#Get p-values
+pw = wci$p.value
+pb = bci$p.value
+ph = hci$p.value
+pa = aci$p.value
+pvals <- c(pw,pb,ph,pa)
+
+#Get boundaries
+lw = wci$conf.int[1]
+lb = bci$conf.int[1]
+lh = hci$conf.int[1]
+la = aci$conf.int[1]
+uw = wci$conf.int[2]
+ub = bci$conf.int[2]
+uh = hci$conf.int[2]
+ua = aci$conf.int[2]
+L <- c(lw,lb,lh,la)
+U <- c(uw,ub,uh,ua)
+
+#Formatting data for plotting
+races <- c("White","Black","Hispanic","Asian")
+#rvals is the standard population proportions of New Orleans
+rvals <- c(whitep,blackp,hispanicp,asianp)
+rdata <- data.frame(races,rvals,L,U)
+
+```
+
+To investigate if racial stop proportions match actual demographic proportions of New Orleans, we will perform one sample proportion tests for each demographic.
+
+For each one-sample proportion test, we have the following null hypotheses:
+
+
+$$
+H_0: P_{race_{actual}} - \widehat P_{race_{data}} = 0 \ (There \ is \ no \ bias \ based \ on \ race) \\
+H_A: P_{race_{actual}} - \widehat P_{race_{data}} \neq 0 \ (There \ is \ bias \ based \ on \ race) \\
+$$
+
+```{r}
+for (i in 1:4){
+print(paste("The p-value for the",races[i],"one sample proportion test is:",pvals[i]))
+print(paste("The conf-interval for the",races[i],"one sample proportion test is:"))
+print(paste("(",L[i],",",U[i],")"))
+}
+```
+
+Given that all these p-values are extremely small, we can say that there is statistical evidence that the proportion of police stops for each race does not match the population demographics proportions. 
+
+```{r}
+ggplot(rdata) +
+    geom_bar(aes(x=races, y=rvals), stat="identity", fill="lightblue", alpha=0.9) +
+    geom_errorbar(aes(x=races, ymin=L, ymax=U), width=0.9, colour="red", linewidth=0.7) +  
+  ggtitle("Population Proportions + Confidence Intervals") + 
+  xlab("Race") + ylab("Race Proportion")
+```
+
+The red areas of the previous graph displays the confidence interval for what we would expect the population to be based on police stops, if race was not a factor in police stops. The blue bars show the actual population proportions of New Orleans, taken from New Orleans census data. Most notably on this graph, we can see that there is a much higher number of police stops made for black people than can be accounted for by the black population proportion, and less police stops for white people than can be account by New Orleans demographics. 
+
+Our dataset spans from 2009 - 2018, though we felt confident using the census data to compare it to since the racial proportions do not appear to change much over the decade. 
+Note that these one-sample proportion tests that were completed do not account for multiracial people. Furthermore, this analysis also doesn't take into account if the police stops were justified or not for each case.
+
+
+```{r}
+BWdata <- data.frame(races[1:2],rvals[1:2],L[1:2],U[1:2])
+ggplot(BWdata) +
+    geom_bar(aes(x=races[1:2], y=rvals[1:2]), stat="identity", fill="lightblue", alpha=0.9) +
+    geom_errorbar(aes(x=races[1:2], ymin=L[1:2], ymax=U[1:2]), width=0.9, colour="red", linewidth=0.7) +   
+  ggtitle("Population Proportions + Confidence Intervals White Vs. Black") + 
+  xlab("Race") + ylab("Race Proportion")
+```
+
+
+```{r}
+Adata <- data.frame(races[4],rvals[4],L[4],U[4])
+ggplot(Adata) +
+    geom_bar(aes(x=races[4], y=rvals[4]), stat="identity", fill="lightblue", alpha=0.9) +
+    geom_errorbar(aes(x=races[4], ymin=L[4], ymax=U[4]), width=0.9, colour="red", linewidth=0.7) +
+  ggtitle("Population Proportions + Confidence Intervals - Asian") + 
+  xlab("Race") + ylab("Race Proportion")
+```
+
+Taking a closer look, we can see that there are also more police stops of Asian/Pacific Islander people within our confidence interval than can be accounted for by demographic based on the interpretation of the demographic data we chose. 
+
+
+```{r}
+Hdata <- data.frame(races[3],rvals[3],L[3],U[3])
+ggplot(Hdata) +
+    geom_bar(aes(x=races[3], y=rvals[3]), stat="identity", fill="lightblue", alpha=0.9) +
+    geom_errorbar(aes(x=races[3], ymin=L[3], ymax=U[3]), width=0.9, colour="red", linewidth=0.7) +
+ggtitle("Population Proportions + Confidence Intervals - Hispanic") +
+  xlab("Race") +
+  ylab("Race Proportion")
+```
+
+For Hispanics, there are less police stops than accounted for with demographic. 
+
+# Police Stops by Location
+
+There are 8 districts in the city of New Orleans. We want to check if there is bias in police stoppage based on location. It means that we want to study if a person travelling in a particular district is more likely to be stopped. We have the the number of stops for each location in our data, however, we have one limitation. We don’t have population proportions for each district.
+
+For the sake of our analysis, we have made an assumption that each district has an equal population proportion.
+
+Here we are testing bias by 8 districts thus we are adjusting our value so that the cumulative value for alpha remains at 5% for all the tests.
+
+```{r}
+adj_alpha1 = New_alpha/8
+adj_alpha1
+```
+
+```{r}
+districts <- unique(df$district)
+n <- length(df$district)
+
+D1 <- length(df[df$district == '1',]$district)
+D2 <- length(df[df$district == '2',]$district)
+D3 <- length(df[df$district == '3',]$district)
+D4 <- length(df[df$district == '4',]$district)
+D5 <- length(df[df$district == '5',]$district)
+D6 <- length(df[df$district == '6',]$district)
+D7 <- length(df[df$district == '7',]$district)
+D8 <- length(df[df$district == '8',]$district)
+
+#Could not find population data based on police district, therefore will
+#test if districts have equal stop probability regardless of population
+p_d = 1/8
+```
+
+```{r}
+#Using multiple tests together, we will adjust the confidence level
+# where we divide alpha to ensure the alpha value is intact.
+tN = 8 * 3
+conf = 1 - (0.05)/tN
+
+#Run two-sided one sample proportion tests against expected district proportions
+d1ci = prop.test(D1,n,p=p_d, conf.level=conf)
+d2ci = prop.test(D2,n,p=p_d, conf.level=conf)
+d3ci = prop.test(D3,n,p=p_d, conf.level=conf)
+d4ci = prop.test(D4,n,p=p_d, conf.level=conf)
+d5ci = prop.test(D5,n,p=p_d, conf.level=conf)
+d6ci = prop.test(D6,n,p=p_d, conf.level=conf)
+d7ci = prop.test(D7,n,p=p_d, conf.level=conf)
+d8ci = prop.test(D8,n,p=p_d, conf.level=conf)
+
+#Get p-values
+pd1 = d1ci$p.value
+pd2 = d2ci$p.value
+pd3 = d3ci$p.value
+pd4 = d4ci$p.value
+pd5 = d5ci$p.value
+pd6 = d6ci$p.value
+pd7 = d7ci$p.value
+pd8 = d8ci$p.value
+
+pvals <- c(pd1,pd2,pd3,pd4,pd5,pd6,pd7,pd8)
+
+#Get boundaries
+ld1 = d1ci$conf.int[1]
+ld2 = d2ci$conf.int[1]
+ld3 = d3ci$conf.int[1]
+ld4 = d4ci$conf.int[1]
+ld5 = d5ci$conf.int[1]
+ld6 = d6ci$conf.int[1]
+ld7 = d7ci$conf.int[1]
+ld8 = d8ci$conf.int[1]
+
+ud1 = d1ci$conf.int[2]
+ud2 = d2ci$conf.int[2]
+ud3 = d3ci$conf.int[2]
+ud4 = d4ci$conf.int[2]
+ud5 = d5ci$conf.int[2]
+ud6 = d6ci$conf.int[2]
+ud7 = d7ci$conf.int[2]
+ud8 = d8ci$conf.int[2]
+
+L <- c(ld1,ld2,ld3,ld4,ld5,ld6,ld7,ld8)
+U <- c(ud1,ud2,ud3,ud4,ud5,ud6,ud7,ud8)
+
+#Formatting data for plotting
+districts <- c("1","2","3","4","5","6","7","8")
+#dvals is the null hypothesis stop amount per district
+dvals <- rep(p_d,8)
+ddata <- data.frame(districts,dvals,L,U)
+
+```
+
+For each one sample proportion test we will perform on each district, we will have the following hypotheses:
+
+$H_{0}: p_{district} = 1/8$ 
+
+$H_{a}: p_{district} \ne 1/8$. 
+
+$$
+H_0: P_{district} = 1/8 \ (There\ is\ bias\ based\ on\ location) \\
+H_A: P_{district} \neq 1/8 \ (There\ is\ no\ bias\ based\ on\ location)
+$$
+
+The null hypothesis represents an equal proportion of stops across all 8 districts, with the null hypothesis being that it is not an equal stop proportion among all districts.
+
+```{r}
+for (i in 1:8){
+print(paste("The p-value for district:",districts[i],"one sample proportion test is:",pvals[i]))
+print(paste("The conf-interval for district:",districts[i],"one sample proportion test is:"))
+print(paste("(",L[i],",",U[i],")"))
+}
+```
+
+Given that all these p-values do not meet the criteria of our confidence interval, we can reject the null hypothesis and say that there is statistical evidence that the proportion of police stops for each district is not equal to 1/8, the proportion describing if every district was equally stopped. 
+
+
+```{r}
+ggplot(ddata) +
+    geom_bar(aes(x=districts, y=dvals), stat="identity", fill="lightblue", alpha=0.9) +
+    geom_errorbar(aes(x=districts, ymin=L, ymax=U), width=0.9, colour="red", linewidth=0.7) +
+  ggtitle("District Proportion Stop Confidence Intervals") + xlab("Police District #") + ylab("District Proportion")
+```
+
+In this graphic, the blue bars are all the same as they represent the hypothetical equal proportions of stops by police districts, whereas the red bars represent the confidence intervals for each district. We can see that there was a higher proportion of stops in districts 3, 6, and 8 compared to the hypothetical equal value, with the rest of the districts having less than an equal proportion of stops.  We note that the interpretation of these district analyses are limited as we were not able to find data listing the population proportions by police district in New Orleans. Therefore, we don't know for example if the confidence interval for district 8 is so much higher than the hypothetical equal due to a higher likelihood of police stops or if it can be explained with a higher population to begin with. The most meaningful interpretation of this analysis is to simply say that there is a difference in confidence interval between each district in terms of stop proportion where the hypothetical value of 1/8 is somewhat less meaningful than the expected values in the previous analyses we have done as it doesn't correspond to an actual statistic to compare our data to. 
+
+
+# General considerations for the race and district analyses for issue #1:
+
+-Driver demographics would provide a more reliable expected value than population demographics, though we did not have data based on New Orleans driver demographics. 
+
+-Multiracial/ambiguous people have not been considered by our data. The New Orleans census data does list some multiracial proportions, but our dataset only focuses on distinct racial groups and there may be variability in identified race by some police officers for people who have a more ambiguous racial appearance.
+
+-We only selected demographic race data from a single census year to compare to, whereas our data spanned ten years. While we acknowledge that race proportions may change from year to year, we assumed this factor to be negligent as we checked census data from different years and saw that the racial proportions in New Orleans have not varied much. 
+
+-To reiterate, our analysis of district proportions is very limited as we do not have the demographic data for each district.
+
+# Guiding Question 2
+
+The second guiding question that we have addressed whether there is any bias after the stop has been made. For example, any particular demographic is more likely to be frisked or arrested after they have been stopped. We have used the test of independence to study this and our analysis along with some visualizations are as follows is as follows:
+
+```{r}
+stops.df <- read.csv("la_new_orleans_2020_04_01.csv")
+stops_clean = stops.df[complete.cases(stops.df), ]
+```
+
+
+```{r}
+natnum = 342
+asnum = 3793
+blanum = 349819
+hispnum = 13491
+whitenum = 129703
+
+natfr = 25
+asfr = 170
+blafr = 49321
+hispfr = 1400
+whitefr = 12071
+
+native_frisk_proportion = natfr/natnum
+asian_frisk_proportion  = asfr/asnum
+black_frisk_proportion = blafr/blanum
+hispanic_frisk_proportion = hispfr/hispnum
+white_frisk_proportion = whitefr/whitenum
+
+natnum = 342
+asnum = 3793
+blanum = 349819
+hispnum = 13491
+whitenum = 129703
+
+natsearch = 29
+assearch = 205
+blasearch = 57940
+hispsearch = 1668
+whitesearch = 15296
+
+native_search_proportion = natsearch/natnum
+asian_search_proportion  = assearch/asnum
+black_search_proportion = blasearch/blanum
+hispanic_search_proportion = hispsearch/hispnum
+white_search_proportion = whitesearch/whitenum
+
+natnum = 342
+asnum = 3793
+blanum = 349819
+hispnum = 13491
+whitenum = 129703
+
+natcit = 146
+ascit = 1490
+blacit = 90303
+hispcit = 5127
+whitecit = 38561
+
+native_citation_proportion = natcit/natnum
+asian_citation_proportion  = ascit/asnum
+black_citation_proportion = blacit/blanum
+hispanic_citation_proportion = hispcit/hispnum
+white_citation_proportion = whitesearch/whitenum
+
+natnum = 342
+asnum = 3793
+blanum = 349819
+hispnum = 13491
+whitenum = 129703
+
+natarr = 36
+asarr = 284
+blaarr = 69602
+hisarr = 2094
+whitearr = 21359
+
+native_arrest_proportion = natarr/natnum
+asian_arrest_proportion  = asarr/asnum
+black_arrest_proportion = blaarr/blanum
+hispanic_arrest_proportion = hisarr/hispnum
+white_arrest_proportion = whitearr/whitenum
+
+group_names <- c("Frisk Proportion", "Search Proportion", "Arrest Proportion", "Citation proportion")
+proportions1 <- c(native_frisk_proportion, asian_frisk_proportion, black_frisk_proportion, hispanic_frisk_proportion, white_frisk_proportion)
+proportions2 <- c(native_search_proportion, asian_search_proportion, black_search_proportion, hispanic_search_proportion, white_search_proportion)
+proportions3 <- c(native_arrest_proportion, asian_arrest_proportion, black_arrest_proportion, hispanic_arrest_proportion, white_arrest_proportion)
+proportions4 <- c(native_citation_proportion, asian_citation_proportion, black_citation_proportion, hispanic_citation_proportion, white_citation_proportion)
+datamatrix <- matrix(c(proportions1, proportions2, proportions3, proportions4), nrow = 4)
+
+data <- data.frame(Group = rep(group_names, each = 5),
+                   Category = rep(c("Native", "Asian", "Black", "Hispanic", "White"), times = 4),
+                   Proportion = as.vector(datamatrix))
+
+ggplot(data, aes(x = Group, y = Proportion, fill = Category)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.8), width = 0.6) +
+  labs(title = "Grouped Bar Plot Example", x = "Group", y = "Proportion") +
+  scale_fill_manual(values = c("Native" = "blue", "Asian" = "purple", "Black" = "violet", "Hispanic" = "pink", "White" = "red"))
+```
+
+We can see in the graph above that Black drivers are more likely to be frisked, searched, and arrested whereas Native and Asian drivers are much more likely to only receive a citation. This may be indicative of police behavior toward specific minorities.
+
+```{r}
+proportion_frisks <- stops.df %>%
+  group_by(subject_sex) %>%
+  summarise(
+    Total_Stops = n(),  # Total number of stops for each gender
+    Frisks = sum(frisk_performed == "TRUE"),  # Total number of frisks for each gender
+    Proportion_Frisks = Frisks / Total_Stops  # Proportion of frisks for each gender
+  )
+
+Gender = proportion_frisks$subject_sex
+
+#print(proportion_frisks)
+ggplot(proportion_frisks, aes(x = proportion_frisks$subject_sex, y = proportion_frisks$Proportion_Frisks, fill=Gender)) +
+  geom_bar(stat = "identity") +
+  labs(
+    title = "Proportion of Frisks by Gender",
+    x = "Gender",
+    y = "Proportion of Frisks"
+  ) +
+  scale_fill_manual(values = c("male" = "blue", "female" = "pink", "NA"="grey")) +
+  theme_minimal()
+
+```
+
+We can see from this graph that the proportion of males being frisked is much higher than females. Perhaps males are also more likely to be pulled over or even exhibit more dangerous driving behaviors. However, there may be some gender bias present.
+
+```{r}
+gg <- ggplot(stops_clean, aes(x = stops_clean$subject_race, fill = stops_clean$contraband_found)) +
+  geom_bar(position = "dodge") +
+  facet_grid(. ~ stops_clean$frisk_performed) +
+  labs(title = "Contraband Found per Frisk Performed by Race",
+       x = "Race",
+       y = "Count") +
+  scale_fill_manual(values = c("TRUE" = "purple", "FALSE" = "lightblue")) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+gg <- gg + guides(fill = guide_legend(title = "Frisk Performed"))
+
+print(gg)
+```
+
+This graph shows frisks performed by race against whether or not contraband is found. This plot is a good indication of whether or not certain races are frisked according to probable cause or not. We can see that the ratio of black drivers who are frisked while not carrying contraband is larger than the same ratio for white drivers.
+
+# CONDITION CHECKING
+
+The main condition required before a test of independence is that the test is carried out on two categorical or nominal variables which in this case, is satisfied. Additionally, the expected count should be greater than or equal to five, else a simulated p-value should be used. A simulated p-value is not used in any of the following tests.
+
+Null values should be handled before conducting the chi-squared test. The chi-squared test assumes that the data is complete and that all observations fall into one of the categories in your contingency table. When data are missing, these assumptions are violated, potentially leading to incorrect p-values and test results.
+
+
+# OVERARCHING HYPOTHESIS
+
+H$_{0}$: Bias is not present after a stop has been made
+H$_{1}$: Bias is present after a stop has been made
+
+Frisks performed will be used as a metric for bias since arrests made and searches conducted may be associated with more probable cause whereas frisks are at the discretion of the police officer. We believe this will allow us to capture policing bias more effectively in our results.
+
+# TEST OF INDEPENDENCE (RACE)
+
+$$
+H_{0}: A\ subject's\ race\ and\ the\ likelihood\\ of\ a\ frisk\ being\ made\ are\ independent\ of\ each\ other\\
+---\\
+H_{A}: A\ subject's\ race\ and\ the\ likelihood\\ of\ a\ frisk\ being\ made\ are\ not\ independent\ of\ each\ other
+$$
+
+```{r}
+contingency_table = tally(~subject_race + frisk_performed, margins=TRUE, data=stops_clean)
+
+test = chisq.test(contingency_table, correct=FALSE)
+
+print(test)
+```
+
+The p-value generated from the first test of independence indicates that the probability of observing a test statistic as extreme or more extreme than the one presented is 0.003939%, if the null hypothesis is correct. Based on this value, we can reject the null hypothesis that the subject's race and the likelihood of a frisk being performed are independent. Combining this conclusion with the knowledge we have of policing in the United States, we can infer that police may be more likely to perform a frisk on non-White, particularly Black individuals. This points to racial bias in behavior of police officers after a stop has been made.
+
+# TEST OF INDEPENDENCE (DISTRICT)
+
+
+$$
+H_{0}: The\ district\ where\ arrest\ takes\ place\ and\\ the\ likelihood\ of\ a\ frisk\ being\ made\ are\ independent\ of\ each\ other\\
+---\\
+H_{A}: The\ district\ where\ arrest\ takes\ place\ and\\ the\ likelihood\ of\ a\ frisk\ being\ made\ are\ not\ independent\ of\ each\ other
+$$
+
+```{r}
+contingency_table2 = tally(~district + frisk_performed, margins=TRUE, data=stops_clean)
+
+test2 = chisq.test(contingency_table2, correct=FALSE)
+
+print(test2)
+```
+
+The p-value generated from the second test of independence indicates that the probability of observing a test statistic as extreme or more extreme than the one presented is almost zero (0.0000002), if the null hypothesis is correct. Based on this value, we can reject the null hypothesis that the district of the stop and the likelihood of a frisk being performed are independent. This means police are more likely to stop cars in certain districts. However, we cannot make any definitive conclusions about bias (i.e. class bias) just from this test.
+
+# TEST OF INDEPENDENCE (SEX)
+
+$$
+H_{0}: The\ subject's\ sex\ and\ the\ likelihood\\ of\ a\ frisk\ being\ made\ are\ independent\ of\ each\ other\\
+---\\
+H_{A}: The\ subject's\ sex\ and\ the\ likelihood\\ of\ a\ frisk\ being\ made\ are\ not\ independent\ of\ each\ other
+$$
+
+```{r}
+contingency_table2 = tally(~subject_sex + frisk_performed, margins=TRUE, data=stops_clean)
+
+test2 = chisq.test(contingency_table2, correct=FALSE)
+
+print(test2)
+
+```
+The p-value generated from the third test of independence indicates that the probability of observing a test statistic as extreme or more extreme than the one presented is 0.01744%, if the null hypothesis is correct. Based on this value, we can reject the null hypothesis that the subject's sex and the likelihood of a frisk being performed are independent. Again, we cannot say that males or females are more likely to experience a frisk given that this test does not indicate anything about direction of correlation. However, we can say that gender bias may be present here.
+
+
+# Conclusion
+
+In this project, we analyzed policing bias in New Orleans based on race, gender, and location. Our investigation encompassed two critical dimensions: the presence of bias in the initiation of police stops and the presence of bias in post-stop interactions.
+
+Based on our visualizations and analysis in the first part of the project, we can infer that females in New Orleans are stopped less than males. This could be due to general differences in driving behavior between the two genders further statistical testing is required to conclude if gender bias is present. Through the proportion tests, we can infer that Black and Asian/Pacific Islander drivers are being stopped more than we would expect them to be based on the overall population demographics which points toward the presence of racial bias. For districts, we can see that drivers in district 3, 6, and 8 are disproportionately stopped. We would like to make inferences based on the income or poverty level of these districts, however, we again cannot make any solid conclusions based on this test due to our limitations previously outlined. In general, we found statistical evidence for the presence of bias in police stops based on the demographics tested (race, gender, and location).
+
+We can make some similar observations about bias for post-stop behavior based on the second part of our analysis. Using three tests of independence to prove one hypothesis requires a lower p-value threshold. When you perform multiple hypothesis tests, there is an increased risk of making a Type I error (false positive) because the probability of observing at least one significant result by chance increases. Therefore, we will use a 1.67% significance level for each sub-hypothesis to ultimately test our overarching hypothesis at a level of 5%.
+
+At the 1% significance level, we can reject each individual test which means we can reject the overarching null hypothesis that there is no bias (based on race, gender, or location) in policing after a traffic stop has been conducted. Although these tests can tell us that bias is present, we cannot make any conclusions about which groups are experiencing this bias post-stop. However, our visualizations suggest that male drivers and particularly black drivers are disproportionately subject to frisks. Further analysis using more advanced techniques such as logistic regression may be a useful extension to take a stronger stance on the issue of police bias in New Orleans.
+
+
+
+# References
+
+Goel, S., Rao, M., and Shroff, R. (2016). Precinct or prejudice? Understanding racial disparities in New York City’s stop-and-frisk policy. The Annals of Applied Statistics Vol. 10, 365-394. 
+DOI: 10.1214/15-AOAS897 
+ 
+Pierson, E., Simoiu, C., Overgoor, J. et al. (2015). The Stanford Open Policing Project. [Data set]. https://openpolicing.stanford.edu/data/	 
+ 
+Pierson, E., Simoiu, C., Overgoor, J. et al. (2020). A large-scale analysis of racial disparities in police stops across the United States. Natural Human Behavior Vol. 4, 736–745. https://doi.org/10.1038/s41562-020-0858-1 
+
+Bureau, U. S. (2022). QuickFacts. Retrieved from United Stated Census Bureau: https://www.census.gov/quickfacts/fact/table/neworleanscitylouisiana/PST045222
+
+Transportation, U. D. (n.d.). Highway Statistics. Retrieved from Federal Highway Administration: https://www.fhwa.dot.gov/policyinformation/statistics/2019/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
